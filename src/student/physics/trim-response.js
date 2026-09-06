@@ -38,7 +38,9 @@ export function calculateDeltaCm(cmAlphaPerRad, disturbanceAlphaDeg) {
     assertFiniteNumber(disturbanceAlphaDeg, "disturbanceAlphaDeg");
 
     const deltaAlphaRad = degreesToRadians(disturbanceAlphaDeg);
-    return cmAlphaPerRad * deltaAlphaRad;
+    return cmAlphaPerRad === 0 || disturbanceAlphaDeg === 0
+    ? 0
+    : cmAlphaPerRad * deltaAlphaRad;
 }
 
 export function classifyDisturbance(
