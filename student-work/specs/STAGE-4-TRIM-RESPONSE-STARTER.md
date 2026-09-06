@@ -99,11 +99,11 @@ Also make the calculated values available through the provided `stability.pitch.
 
 Before asking ChatGPT for code, complete each prediction in your own words.
 
-1. If `Cm_alpha < 0` and the angle-of-attack disturbance is positive, `delta_Cm` should be `[COMPLETE]` because `[COMPLETE]`.
-2. If `Cm_alpha > 0` and the angle-of-attack disturbance is positive, the response should be `[COMPLETE]` because `[COMPLETE]`.
-3. If `Cm_alpha = 0`, changing angle of attack should `[COMPLETE]`.
-4. If `Cm0` is fixed and the magnitude of a nonzero `Cm_alpha` increases, the trim angle magnitude should `[COMPLETE]`.
-5. Doubling `disturbanceAlphaDeg` while holding `Cm_alpha` fixed should `[COMPLETE]`.
+1. If `Cm_alpha < 0` and the angle-of-attack disturbance is positive, `delta_Cm` should be negative because The piching moment oppose the disturbanr with restoring tendency.
+2. If `Cm_alpha > 0` and the angle-of-attack disturbance is positive, the response should be  destabilising tendency because pitching moment increase disturbnce.
+3. If `Cm_alpha = 0`, changing angle of attack should No change to pitching moment.
+4. If `Cm0` is fixed and the magnitude of a nonzero `Cm_alpha` increases, the trim angle magnitude should decrease.
+5. Doubling `disturbanceAlphaDeg` while holding `Cm_alpha` fixed should double.
 
 ## 8. Reference Calculation — STUDENT COMPLETES
 
@@ -111,28 +111,36 @@ Use the assigned class values or values approved by your instructor. Show the su
 
 ```text
 Inputs:
-Cm0 = [COMPLETE]
-Cm_alpha = [COMPLETE] 1/rad
-alpha = [COMPLETE] deg
-delta_alpha = [COMPLETE] deg
+Cm0 = 0.04
+Cm_alpha = -0.8 1/rad
+alpha = 2.86 deg
+delta_alpha = +2.00 deg
 
 Angle conversion:
-alpha_rad = [SHOW WORK]
-delta_alpha_rad = [SHOW WORK]
+alpha_rad = 2.86 deg * (pi/180deg) = 0.499rad
+delta_alpha_rad = 2.00 deg * (pi/180) = 0.0349 rad
 
 Current pitching-moment coefficient:
-Cm(alpha) = [SHOW WORK]
+Cm(alpha) = = Cm0 + Cm_alpha * alpha_rad
+          = 0.04 + (-0.8)(0.0499)
+         = 0.0001
 
 Trim angle:
-alpha_trim_rad = [SHOW WORK]
-alpha_trim_deg = [SHOW WORK]
+alpha_trim_rad = = -0.04 / (-0.8)
+               = 0.0500 rad
+alpha_trim_deg = 0.0500 * (180 / pi)
+               = 2.865 
 
 Disturbance response:
-delta_Cm = [SHOW WORK]
+delta_Cm =  Cm_alpha * delta_alpha_rad
+
+         = (-0.8)(0.0349)
+
+         = -0.027
 
 Expected classifications:
-selected condition = [trimmed / not trimmed]
-disturbance tendency = [restoring / neutral / destabilizing]
+selected condition = trimmed 
+disturbance tendency = restoring
 ```
 
 ## 9. Verification Cases — STUDENT COMPLETES
