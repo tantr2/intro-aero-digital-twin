@@ -117,7 +117,7 @@ alpha = 2.86 deg
 delta_alpha = +2.00 deg
 
 Angle conversion:
-alpha_rad = 2.86 deg * (pi/180deg) = 0.499rad
+alpha_rad = 2.86 deg * (pi/180deg) = 0.0499 rad
 delta_alpha_rad = 2.00 deg * (pi/180) = 0.0349 rad
 
 Current pitching-moment coefficient:
