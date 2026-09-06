@@ -149,27 +149,49 @@ Define all three cases before implementation. Include exact inputs, expected out
 
 ### 9.1 Numerical case
 
-Use your Section 8 reference calculation.
+Inputs:
+Cm0 = 0.04
+Cm_alpha = -0.8 1/rad
+alpha = 2.86 deg
+delta_alpha = +2.00 deg
 
-```text
-[COMPLETE]
-```
+Expected:
+Cm(alpha) ≈ 0.0001
+alpha_trim ≈ 2.865 deg
+delta_Cm ≈ -0.027
+selected condition = trimmed
+disturbance tendency = restoring
+
+Tolerance:
+Use 1e-4 for the numerical Cm and delta_Cm comparisons because the reference values are rounded.
 
 ### 9.2 Behavioral case
 
-Change one input and state the exact trend or sign that must result.
+Inputs:
+Cm0 = 0.04
+Cm_alpha = -0.8 1/rad
+alpha = 2.86 deg
+disturbance_alpha = +4.00 deg
 
-```text
-[COMPLETE]
-```
+Expected:
+Doubling the disturbance from +2.00 deg to +4.00 deg should double the magnitude of delta_Cm.
+delta_Cm should remain negative and the disturbance tendency should remain restoring.
 
 ### 9.3 Boundary or sanity case
 
-Use an informative boundary such as zero slope, zero disturbance, or the trim condition. State the exact behavior expected and why division by zero or a false physical claim must not occur.
+Inputs:
+Cm0 = 0.04
+Cm_alpha = 0 1/rad
+alpha = 2.86 deg
+disturbance_alpha = +2.00 deg
 
-```text
-[COMPLETE]
-```
+Expected:
+Cm(alpha) = 0.04
+delta_Cm = 0
+trim angle = not available
+
+The trim angle should not be calculated because Cm_alpha is zero and division by zero must be avoided.
+The disturbance tendency should be neutral because delta_Cm is zero.
 
 ## 10. Feature Requirements
 
@@ -203,9 +225,7 @@ Do not modify any existing file.
 
 In one or two sentences, state what decision the completed feature will support and what it cannot establish.
 
-```text
-[COMPLETE]
-```
+The feature will support checking whether the selected condition is trimmed and whether a small angle-of-attack disturbance has a restoring or destabilizing tendency. It cannot establish flight safety, controllability, or real-world flightworthiness.
 
 ---
 
