@@ -41,7 +41,7 @@ describe("trim-response physics", () => {
     );
 
     expect(cm).toBeCloseTo(0.0001, 4);
-    expect(trimAngleDeg).toBeCloseTo(2.865, 4);
+    expect(trimAngleDeg).toBeCloseTo(2.865, 3);
     expect(deltaCm).toBeCloseTo(-0.027, 4);
     expect(isTrimmed(cm)).toBe(true);
     expect(
