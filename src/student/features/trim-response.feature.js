@@ -1,10 +1,6 @@
 import {
   analyzePitchingMoment,
   calculateCm,
-  calculateDeltaCm,
-  calculateTrimAngleDeg,
-  classifyDisturbance,
-  isTrimmed,
 } from "../physics/trim-response.js";
 
 const REQUIRED_CAPABILITY = {
@@ -51,16 +47,12 @@ function capabilityIsAvailable(capabilityContext, required) {
     if (capabilities && typeof capabilities === "object") {
       const entry = capabilities[required.id];
 
-      if (typeof entry === "number") {
-        if (entry >= required.version) {
-          return true;
-        }
+      if (typeof entry === "number" && entry >= required.version) {
+        return true;
       }
 
-      if (typeof entry === "string") {
-        if (Number(entry) >= required.version) {
-          return true;
-        }
+      if (typeof entry === "string" && Number(entry) >= required.version) {
+        return true;
       }
 
       if (entry && typeof entry === "object") {
@@ -128,7 +120,7 @@ function numericalVerificationCase() {
 
   return {
     id: "numerical",
-    title: "Numerical case",
+    label: "Numerical case",
     inputs,
     expected: {
       cm: expectedCm,
@@ -138,7 +130,11 @@ function numericalVerificationCase() {
       disturbanceTendency: "restoring",
     },
     passed:
-      approximatelyEqual(actual.cm, expectedCm, CM_TOLERANCE) &&
+      approximatelyEqual(
+        actual.cm,
+        expectedCm,
+        CM_TOLERANCE,
+      ) &&
       approximatelyEqual(
         actual.trimAngleDeg,
         expectedTrimDeg,
@@ -171,13 +167,14 @@ function behavioralVerificationCase() {
   const doubledResult = analyzePitchingMoment(doubledInputs);
 
   const expectedMagnitudeRatio = 2;
+
   const actualMagnitudeRatio =
     Math.abs(doubledResult.deltaCm) /
     Math.abs(baseResult.deltaCm);
 
   return {
     id: "behavioral",
-    title: "Behavioral case",
+    label: "Behavioral case",
     inputs: {
       baseline: baseInputs,
       doubledDisturbance: doubledInputs,
@@ -212,7 +209,7 @@ function boundaryVerificationCase() {
 
   return {
     id: "boundary-sanity",
-    title: "Boundary or sanity case",
+    label: "Boundary or sanity case",
     inputs,
     expected: {
       cm: 0.04,
@@ -221,7 +218,11 @@ function boundaryVerificationCase() {
       disturbanceTendency: "neutral",
     },
     passed:
-      approximatelyEqual(actual.cm, 0.04, CM_TOLERANCE) &&
+      approximatelyEqual(
+        actual.cm,
+        0.04,
+        CM_TOLERANCE,
+      ) &&
       approximatelyZero(actual.deltaCm) &&
       actual.trimAngleDeg === null &&
       actual.disturbanceTendency === "neutral",
@@ -296,7 +297,9 @@ function buildResults(results) {
     {
       id: "trim-status",
       label: "Selected condition",
-      value: results.trimmed ? "trimmed" : "not trimmed",
+      value: results.trimmed
+        ? "trimmed"
+        : "not trimmed",
       unit: "",
       precision: 0,
       emphasis: false,
@@ -314,13 +317,19 @@ function buildResults(results) {
 
 export const feature = {
   contractVersion: 4,
+
   id: "trim-response",
+
   title: "Live Cm–alpha relationship and trim",
+
   description:
     "Checks trim and small-disturbance pitching-moment tendency using " +
     "a linear quasi-static Cm-alpha model.",
+
   category: "Stability · Student feature",
+
   learningMode: "concept",
+
   topicId: "stability",
 
   inputKeys: [
@@ -381,12 +390,16 @@ export const feature = {
             "At the selected angle of attack, is the simplified " +
             "pitching-moment model trimmed, and does a small angle-of-" +
             "attack disturbance create a restoring moment tendency?",
+
           interpretation:
             "The required loads.pitch.component-sum capability is not " +
             "available at the required version, so Stage 4 cannot be evaluated.",
+
           status: "caution",
         },
+
         plots: [],
+
         scene: null,
       };
     }
@@ -411,13 +424,16 @@ export const feature = {
           "At the selected angle of attack, is the simplified " +
           "pitching-moment model trimmed, and does a small angle-of-" +
           "attack disturbance create a restoring moment tendency?",
+
         interpretation: decision.interpretation,
+
         status: decision.status,
       },
 
       plots: [
         {
           id: "cm-alpha",
+
           title: "Cm–alpha relationship",
 
           xAxis: {
@@ -435,7 +451,9 @@ export const feature = {
           series: [
             {
               id: "cm-alpha-model",
+
               label: "Cm(alpha)",
+
               points: buildPlotPoints(aircraft),
             },
           ],
@@ -465,7 +483,9 @@ export const model = {
     const aircraft = runtimeContext?.aircraft;
 
     if (!aircraft) {
-      throw new TypeError("runtimeContext.aircraft is required");
+      throw new TypeError(
+        "runtimeContext.aircraft is required",
+      );
     }
 
     const calculated = analyzePitchingMoment(aircraft);
@@ -473,10 +493,18 @@ export const model = {
     return {
       values: {
         cm: calculated.cm,
-        trimAngleDeg: calculated.trimAngleDeg,
+
+        trimAngleDeg:
+          calculated.trimAngleDeg === null
+            ? "not available"
+            : calculated.trimAngleDeg,
+
         deltaCm: calculated.deltaCm,
+
         trimmed: calculated.trimmed,
-        disturbanceTendency: calculated.disturbanceTendency,
+
+        disturbanceTendency:
+          calculated.disturbanceTendency,
       },
     };
   },
