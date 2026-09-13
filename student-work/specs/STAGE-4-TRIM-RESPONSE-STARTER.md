@@ -103,7 +103,7 @@ Before asking ChatGPT for code, complete each prediction in your own words.
 2. If `Cm_alpha > 0` and the angle-of-attack disturbance is positive, the response should be  destabilising tendency because pitching moment increase disturbnce.
 3. If `Cm_alpha = 0`, changing angle of attack should No change to pitching moment.
 4. If `Cm0` is fixed and the magnitude of a nonzero `Cm_alpha` increases, the trim angle magnitude should decrease.
-5. Doubling `disturbanceAlphaDeg` while holding `Cm_alpha` fixed should double.
+5. Doubling `disturbanceAlphaDeg` while holding `Cm_alpha` fixed should double the magnitude of `delta_Cm`
 
 ## 8. Reference Calculation — STUDENT COMPLETES
 
