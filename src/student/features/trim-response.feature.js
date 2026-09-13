@@ -29,25 +29,45 @@ function approximatelyZero(value, tolerance = CM_TOLERANCE) {
 }
 
 function capabilityIsAvailable(capabilityContext, required) {
-  const capabilities = capabilityContext?.capabilities;
+  const candidates = [
+    capabilityContext,
+    capabilityContext?.capabilities,
+    capabilityContext?.runtimeContext?.capabilities,
+  ];
 
-  if (Array.isArray(capabilities)) {
-    return capabilities.some((capability) => (
-      capability &&
-      capability.id === required.id &&
-      Number(capability.version) >= required.version
-    ));
-  }
+  for (const capabilities of candidates) {
+    if (Array.isArray(capabilities)) {
+      const found = capabilities.some((capability) => (
+        capability &&
+        capability.id === required.id &&
+        Number(capability.version) >= required.version
+      ));
 
-  if (capabilities && typeof capabilities === "object") {
-    const entry = capabilities[required.id];
-
-    if (typeof entry === "number") {
-      return entry >= required.version;
+      if (found) {
+        return true;
+      }
     }
 
-    if (entry && typeof entry === "object") {
-      return Number(entry.version) >= required.version;
+    if (capabilities && typeof capabilities === "object") {
+      const entry = capabilities[required.id];
+
+      if (typeof entry === "number") {
+        if (entry >= required.version) {
+          return true;
+        }
+      }
+
+      if (typeof entry === "string") {
+        if (Number(entry) >= required.version) {
+          return true;
+        }
+      }
+
+      if (entry && typeof entry === "object") {
+        if (Number(entry.version) >= required.version) {
+          return true;
+        }
+      }
     }
   }
 
@@ -302,31 +322,42 @@ export const feature = {
   category: "Stability · Student feature",
   learningMode: "concept",
   topicId: "stability",
+
   inputKeys: [
     "cm0",
     "cmAlphaPerRad",
     "angleOfAttackDeg",
     "disturbanceAlphaDeg",
   ],
-  requiresCapabilities: [REQUIRED_CAPABILITY],
+
+  requiresCapabilities: [
+    {
+      id: "loads.pitch.component-sum",
+      version: 1,
+    },
+  ],
+
   providesCapabilities: [
     {
       id: "stability.pitch.cm-alpha",
       version: 1,
     },
   ],
+
   assumptions: [
     "The Cm-alpha relationship is linear over the investigated range.",
     "The model is quasi-static and represents a small disturbance about the selected condition.",
     "Cm0 and Cm_alpha represent the same aircraft configuration and flight condition.",
     "Positive pitching moment and positive angle of attack are nose-up.",
   ],
+
   validityLimits: [
     "Do not use this linear relationship at stall, at large angle of attack, or where aerodynamic coefficients are strongly nonlinear.",
     "This model does not calculate a time history, damping, control motion, or handling quality.",
     "A restoring tendency in this model is not proof of acceptable safety, controllability, or flightworthiness.",
     "The calculated trim angle is meaningful only when the linear model remains valid at that angle.",
   ],
+
   simulation: {
     display: "analysis-only",
     durationS: 1,
@@ -372,7 +403,9 @@ export const feature = {
 
     return {
       results: buildResults(calculated),
+
       verificationCases,
+
       decision: {
         question:
           "At the selected angle of attack, is the simplified " +
@@ -381,20 +414,24 @@ export const feature = {
         interpretation: decision.interpretation,
         status: decision.status,
       },
+
       plots: [
         {
           id: "cm-alpha",
           title: "Cm–alpha relationship",
+
           xAxis: {
             label: "Angle of attack",
             unit: "deg",
             min: PLOT_MIN_DEG,
             max: PLOT_MAX_DEG,
           },
+
           yAxis: {
             label: "Pitching-moment coefficient",
             unit: "",
           },
+
           series: [
             {
               id: "cm-alpha-model",
@@ -402,7 +439,9 @@ export const feature = {
               points: buildPlotPoints(aircraft),
             },
           ],
+
           regions: [],
+
           referenceLines: [
             {
               id: "trim-line",
@@ -413,6 +452,7 @@ export const feature = {
           ],
         },
       ],
+
       scene: null,
     };
   },
