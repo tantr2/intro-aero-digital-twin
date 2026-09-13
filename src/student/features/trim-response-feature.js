@@ -1,364 +1,443 @@
 import {
-    calculateCm,
-    calculateTrimAngleDeg,
-    calculateDeltaCm,
-    classifyDisturbance,
-    isTrimmed,
+  analyzePitchingMoment,
+  calculateCm,
+  calculateDeltaCm,
+  calculateTrimAngleDeg,
+  classifyDisturbance,
+  isTrimmed,
 } from "../physics/trim-response.js";
 
-const CONTRACT_VERSION = 4;
+const REQUIRED_CAPABILITY = {
+  id: "loads.pitch.component-sum",
+  version: 1,
+};
+
+const PLOT_MIN_DEG = -10;
+const PLOT_MAX_DEG = 10;
+const PLOT_STEP_DEG = 1;
+
+const CM_TOLERANCE = 1e-6;
+const DELTA_CM_TOLERANCE = 1e-4;
 const TRIM_TOLERANCE = 1e-6;
 
-const REFERENCE_AIRCRAFT = {
+function approximatelyEqual(actual, expected, tolerance) {
+  return Math.abs(actual - expected) <= tolerance;
+}
+
+function approximatelyZero(value, tolerance = CM_TOLERANCE) {
+  return Math.abs(value) <= tolerance;
+}
+
+function capabilityIsAvailable(capabilityContext, required) {
+  const capabilities = capabilityContext?.capabilities;
+
+  if (Array.isArray(capabilities)) {
+    return capabilities.some((capability) => (
+      capability &&
+      capability.id === required.id &&
+      Number(capability.version) >= required.version
+    ));
+  }
+
+  if (capabilities && typeof capabilities === "object") {
+    const entry = capabilities[required.id];
+
+    if (typeof entry === "number") {
+      return entry >= required.version;
+    }
+
+    if (entry && typeof entry === "object") {
+      return Number(entry.version) >= required.version;
+    }
+  }
+
+  return false;
+}
+
+function buildPlotPoints(aircraft) {
+  const points = [];
+
+  for (
+    let angleDeg = PLOT_MIN_DEG;
+    angleDeg <= PLOT_MAX_DEG;
+    angleDeg += PLOT_STEP_DEG
+  ) {
+    points.push({
+      x: angleDeg,
+      y: calculateCm(
+        aircraft.cm0,
+        aircraft.cmAlphaPerRad,
+        angleDeg,
+      ),
+    });
+  }
+
+  if (
+    aircraft.angleOfAttackDeg >= PLOT_MIN_DEG &&
+    aircraft.angleOfAttackDeg <= PLOT_MAX_DEG &&
+    !points.some((point) => point.x === aircraft.angleOfAttackDeg)
+  ) {
+    points.push({
+      x: aircraft.angleOfAttackDeg,
+      y: calculateCm(
+        aircraft.cm0,
+        aircraft.cmAlphaPerRad,
+        aircraft.angleOfAttackDeg,
+      ),
+    });
+
+    points.sort((a, b) => a.x - b.x);
+  }
+
+  return points;
+}
+
+function numericalVerificationCase() {
+  const inputs = {
     cm0: 0.04,
     cmAlphaPerRad: -0.8,
-    angleOfAttackDeg: 2.86479,
+    angleOfAttackDeg: 2.864789,
     disturbanceAlphaDeg: 2.0,
-};
+  };
 
-function hasRequiredCapability(capabilityContext) {
-    const capabilities = capabilityContext?.capabilities;
+  const actual = analyzePitchingMoment(inputs);
 
-    if (!capabilities) {
-        return false;
-    }
+  const expectedCm = 0;
+  const expectedTrimDeg = 2.864789;
+  const expectedDeltaCm = -0.027925;
 
-    if (Array.isArray(capabilities)) {
-        return capabilities.some(
-            (capability) =>
-                capability === "loads.pitch.component-sum" ||
-                capability?.id === "loads.pitch.component-sum" ||
-                capability?.name === "loads.pitch.component-sum"
-        );
-    }
-
-    return Boolean(
-        capabilities["loads.pitch.component-sum"] ||
-        capabilities["loads.pitch.component-sum@1"]
-    );
+  return {
+    id: "numerical",
+    title: "Numerical case",
+    inputs,
+    expected: {
+      cm: expectedCm,
+      trimAngleDeg: expectedTrimDeg,
+      deltaCm: expectedDeltaCm,
+      trimmed: true,
+      disturbanceTendency: "restoring",
+    },
+    passed:
+      approximatelyEqual(actual.cm, expectedCm, CM_TOLERANCE) &&
+      approximatelyEqual(
+        actual.trimAngleDeg,
+        expectedTrimDeg,
+        TRIM_TOLERANCE,
+      ) &&
+      approximatelyEqual(
+        actual.deltaCm,
+        expectedDeltaCm,
+        DELTA_CM_TOLERANCE,
+      ) &&
+      actual.trimmed === true &&
+      actual.disturbanceTendency === "restoring",
+  };
 }
 
-function validateAircraft(aircraft) {
-    if (!aircraft || typeof aircraft !== "object") {
-        throw new TypeError("aircraft must be an object");
+function behavioralVerificationCase() {
+  const baseInputs = {
+    cm0: 0.04,
+    cmAlphaPerRad: -0.8,
+    angleOfAttackDeg: 2.86,
+    disturbanceAlphaDeg: 2.0,
+  };
+
+  const doubledInputs = {
+    ...baseInputs,
+    disturbanceAlphaDeg: 4.0,
+  };
+
+  const baseResult = analyzePitchingMoment(baseInputs);
+  const doubledResult = analyzePitchingMoment(doubledInputs);
+
+  const expectedMagnitudeRatio = 2;
+  const actualMagnitudeRatio =
+    Math.abs(doubledResult.deltaCm) /
+    Math.abs(baseResult.deltaCm);
+
+  return {
+    id: "behavioral",
+    title: "Behavioral case",
+    inputs: {
+      baseline: baseInputs,
+      doubledDisturbance: doubledInputs,
+    },
+    expected: {
+      magnitudeRelationship:
+        "Doubling disturbanceAlphaDeg doubles the magnitude of delta_Cm",
+      doubledDeltaCmMagnitudeRatio: expectedMagnitudeRatio,
+      deltaCmSign: "negative",
+      disturbanceTendency: "restoring",
+    },
+    passed:
+      approximatelyEqual(
+        actualMagnitudeRatio,
+        expectedMagnitudeRatio,
+        DELTA_CM_TOLERANCE,
+      ) &&
+      doubledResult.deltaCm < 0 &&
+      doubledResult.disturbanceTendency === "restoring",
+  };
+}
+
+function boundaryVerificationCase() {
+  const inputs = {
+    cm0: 0.04,
+    cmAlphaPerRad: 0,
+    angleOfAttackDeg: 2.86,
+    disturbanceAlphaDeg: 2.0,
+  };
+
+  const actual = analyzePitchingMoment(inputs);
+
+  return {
+    id: "boundary-sanity",
+    title: "Boundary or sanity case",
+    inputs,
+    expected: {
+      cm: 0.04,
+      deltaCm: 0,
+      trimAngleDeg: "not available",
+      disturbanceTendency: "neutral",
+    },
+    passed:
+      approximatelyEqual(actual.cm, 0.04, CM_TOLERANCE) &&
+      approximatelyZero(actual.deltaCm) &&
+      actual.trimAngleDeg === null &&
+      actual.disturbanceTendency === "neutral",
+  };
+}
+
+function buildDecision(results) {
+  if (!results.trimmed) {
+    return {
+      status: "caution",
+      interpretation:
+        "The selected condition is not trimmed under the specified " +
+        "linear quasi-static model.",
+    };
+  }
+
+  if (results.disturbanceTendency === "destabilizing") {
+    return {
+      status: "caution",
+      interpretation:
+        "The selected condition is trimmed, but the specified disturbance " +
+        "has a destabilizing tendency in this model.",
+    };
+  }
+
+  if (results.disturbanceTendency === "neutral") {
+    return {
+      status: "neutral",
+      interpretation:
+        "The selected condition is trimmed and the specified disturbance " +
+        "has a neutral tendency in this model.",
+    };
+  }
+
+  return {
+    status: "pass",
+    interpretation:
+      "The selected condition is trimmed and the specified small " +
+      "disturbance has a restoring tendency in this model.",
+  };
+}
+
+function buildResults(results) {
+  return [
+    {
+      id: "cm-alpha",
+      label: "Cm(alpha)",
+      value: results.cm,
+      unit: "",
+      precision: 6,
+      emphasis: true,
+    },
+    {
+      id: "trim-angle",
+      label: "Trim angle",
+      value:
+        results.trimAngleDeg === null
+          ? "not available"
+          : results.trimAngleDeg,
+      unit: results.trimAngleDeg === null ? "" : "deg",
+      precision: 6,
+      emphasis: false,
+    },
+    {
+      id: "delta-cm",
+      label: "delta_Cm",
+      value: results.deltaCm,
+      unit: "",
+      precision: 6,
+      emphasis: false,
+    },
+    {
+      id: "trim-status",
+      label: "Selected condition",
+      value: results.trimmed ? "trimmed" : "not trimmed",
+      unit: "",
+      precision: 0,
+      emphasis: false,
+    },
+    {
+      id: "disturbance-tendency",
+      label: "Disturbance tendency",
+      value: results.disturbanceTendency,
+      unit: "",
+      precision: 0,
+      emphasis: false,
+    },
+  ];
+}
+
+export const feature = {
+  contractVersion: 4,
+  id: "trim-response",
+  title: "Live Cm–alpha relationship and trim",
+  description:
+    "Checks trim and small-disturbance pitching-moment tendency using " +
+    "a linear quasi-static Cm-alpha model.",
+  category: "Stability · Student feature",
+  learningMode: "concept",
+  topicId: "stability",
+  inputKeys: [
+    "cm0",
+    "cmAlphaPerRad",
+    "angleOfAttackDeg",
+    "disturbanceAlphaDeg",
+  ],
+  requiresCapabilities: [REQUIRED_CAPABILITY],
+  providesCapabilities: [
+    {
+      id: "stability.pitch.cm-alpha",
+      version: 1,
+    },
+  ],
+  assumptions: [
+    "The Cm-alpha relationship is linear over the investigated range.",
+    "The model is quasi-static and represents a small disturbance about the selected condition.",
+    "Cm0 and Cm_alpha represent the same aircraft configuration and flight condition.",
+    "Positive pitching moment and positive angle of attack are nose-up.",
+  ],
+  validityLimits: [
+    "Do not use this linear relationship at stall, at large angle of attack, or where aerodynamic coefficients are strongly nonlinear.",
+    "This model does not calculate a time history, damping, control motion, or handling quality.",
+    "A restoring tendency in this model is not proof of acceptable safety, controllability, or flightworthiness.",
+    "The calculated trim angle is meaningful only when the linear model remains valid at that angle.",
+  ],
+  simulation: {
+    display: "analysis-only",
+    durationS: 1,
+    initialState: {},
+    controls: {},
+    disturbance: {},
+  },
+
+  analyze(aircraft, capabilityContext) {
+    const capabilityAvailable = capabilityIsAvailable(
+      capabilityContext,
+      REQUIRED_CAPABILITY,
+    );
+
+    if (!capabilityAvailable) {
+      return {
+        results: [],
+        verificationCases: [],
+        decision: {
+          question:
+            "At the selected angle of attack, is the simplified " +
+            "pitching-moment model trimmed, and does a small angle-of-" +
+            "attack disturbance create a restoring moment tendency?",
+          interpretation:
+            "The required loads.pitch.component-sum capability is not " +
+            "available at the required version, so Stage 4 cannot be evaluated.",
+          status: "caution",
+        },
+        plots: [],
+        scene: null,
+      };
     }
 
-    const requiredKeys = [
-        "cm0",
-        "cmAlphaPerRad",
-        "angleOfAttackDeg",
-        "disturbanceAlphaDeg",
+    const calculated = analyzePitchingMoment(aircraft);
+
+    const verificationCases = [
+      numericalVerificationCase(),
+      behavioralVerificationCase(),
+      boundaryVerificationCase(),
     ];
 
-    for (const key of requiredKeys) {
-        if (
-            typeof aircraft[key] !== "number" ||
-            !Number.isFinite(aircraft[key])
-        ) {
-            throw new TypeError(`${key} must be a finite number`);
-        }
-    }
-}
-
-function calculateAnalysis(aircraft) {
-    validateAircraft(aircraft);
-
-    const cm = calculateCm(
-        aircraft.cm0,
-        aircraft.cmAlphaPerRad,
-        aircraft.angleOfAttackDeg
-    );
-
-    const trimAngleDeg = calculateTrimAngleDeg(
-        aircraft.cm0,
-        aircraft.cmAlphaPerRad
-    );
-
-    const deltaCm = calculateDeltaCm(
-        aircraft.cmAlphaPerRad,
-        aircraft.disturbanceAlphaDeg
-    );
-
-    const tendency = classifyDisturbance(
-        aircraft.disturbanceAlphaDeg,
-        deltaCm
-    );
-
-    const trimmed = isTrimmed(cm);
+    const decision = buildDecision(calculated);
 
     return {
-        cm,
-        trimAngleDeg,
-        deltaCm,
-        trimmed,
-        tendency,
-    };
-}
-
-function makeVerificationCases() {
-    const numerical = calculateAnalysis(REFERENCE_AIRCRAFT);
-
-    const doubledDisturbanceAircraft = {
-        ...REFERENCE_AIRCRAFT,
-        disturbanceAlphaDeg: 4.0,
-    };
-
-    const doubledDisturbance = calculateAnalysis(
-        doubledDisturbanceAircraft
-    );
-
-    const boundaryAircraft = {
-        cm0: 0.04,
-        cmAlphaPerRad: 0,
-        angleOfAttackDeg: 2.86,
-        disturbanceAlphaDeg: 2.0,
-    };
-
-    const boundary = calculateAnalysis(boundaryAircraft);
-
-    return [
+      results: buildResults(calculated),
+      verificationCases,
+      decision: {
+        question:
+          "At the selected angle of attack, is the simplified " +
+          "pitching-moment model trimmed, and does a small angle-of-" +
+          "attack disturbance create a restoring moment tendency?",
+        interpretation: decision.interpretation,
+        status: decision.status,
+      },
+      plots: [
         {
-            id: "numerical-reference",
-            description: "Reference trimmed condition with a positive disturbance.",
-            inputs: REFERENCE_AIRCRAFT,
-            expected: {
-                cm: 0.0001,
-                trimAngleDeg: 2.86479,
-                deltaCm: -0.0279253,
-                trimmed: true,
-                tendency: "restoring",
-            },
-            passed:
-                Math.abs(numerical.cm - 0.0001) <= 1e-4 &&
-                numerical.trimAngleDeg !== null &&
-                Math.abs(numerical.trimAngleDeg - 2.86479) <= 1e-4 &&
-                Math.abs(numerical.deltaCm - (-0.0279253)) <= 1e-4 &&
-                numerical.trimmed === true &&
-                numerical.tendency === "restoring",
-        },
-        {
-            id: "doubled-disturbance",
-            description: "Doubling disturbance angle doubles delta_Cm magnitude.",
-            inputs: doubledDisturbanceAircraft,
-            expected: {
-                deltaCmMagnitudeRatio: 2,
-                tendency: "restoring",
-            },
-            passed:
-                Math.abs(
-                    Math.abs(doubledDisturbance.deltaCm) /
-                        Math.abs(numerical.deltaCm) -
-                        2
-                ) <= 1e-10 &&
-                doubledDisturbance.tendency === "restoring",
-        },
-        {
-            id: "zero-slope-boundary",
-            description: "Zero Cm-alpha slope produces no disturbance moment change and no available trim angle.",
-            inputs: boundaryAircraft,
-            expected: {
-                cm: 0.04,
-                trimAngleDeg: null,
-                deltaCm: 0,
-                trimmed: false,
-                tendency: "neutral",
-            },
-            passed:
-                Math.abs(boundary.cm - 0.04) <= 1e-10 &&
-                boundary.trimAngleDeg === null &&
-                Math.abs(boundary.deltaCm) <= 1e-10 &&
-                boundary.trimmed === false &&
-                boundary.tendency === "neutral",
-        },
-    ];
-}
-
-function buildPlot() {
-    const points = [];
-
-    for (let angleDeg = -10; angleDeg <= 10; angleDeg += 1) {
-        points.push({
-            x: angleDeg,
-            y: calculateCm(
-                REFERENCE_AIRCRAFT.cm0,
-                REFERENCE_AIRCRAFT.cmAlphaPerRad,
-                angleDeg
-            ),
-        });
-    }
-
-    return {
-        id: "cm-alpha",
-        title: "Cm–Alpha Relationship",
-        x: {
+          id: "cm-alpha",
+          title: "Cm–alpha relationship",
+          xAxis: {
             label: "Angle of attack",
             unit: "deg",
-        },
-        y: {
-            label: "Pitching moment coefficient",
+            min: PLOT_MIN_DEG,
+            max: PLOT_MAX_DEG,
+          },
+          yAxis: {
+            label: "Pitching-moment coefficient",
             unit: "",
-        },
-        points,
-        lines: [
+          },
+          series: [
             {
-                id: "cm-zero",
-                type: "horizontal",
-                value: 0,
-                label: "Cm = 0",
+              id: "cm-alpha-model",
+              label: "Cm(alpha)",
+              points: buildPlotPoints(aircraft),
             },
-        ],
-        regions: [],
+          ],
+          regions: [],
+          referenceLines: [
+            {
+              id: "trim-line",
+              label: "Cm = 0",
+              axis: "y",
+              value: 0,
+            },
+          ],
+        },
+      ],
+      scene: null,
     };
-}
-
-export const trimResponseFeature = {
-    contractVersion: CONTRACT_VERSION,
-
-    id: "trim-response",
-
-    title: "Live Cm–Alpha Relationship and Trim",
-
-    description:
-        "Evaluates the simplified pitching-moment model at the selected angle of attack and classifies the response to a small angle-of-attack disturbance.",
-
-    category: "stability",
-
-    learningMode: "analysis",
-
-    topicId: "pitch-stability",
-
-    inputKeys: [
-        "cm0",
-        "cmAlphaPerRad",
-        "angleOfAttackDeg",
-        "disturbanceAlphaDeg",
-    ],
-
-    requiresCapabilities: [
-        {
-            id: "loads.pitch.component-sum",
-            version: 1,
-        },
-    ],
-
-    providesCapabilities: [
-        {
-            id: "stability.pitch.cm-alpha",
-            version: 1,
-        },
-    ],
-
-    assumptions: [
-        "Linear Cm-alpha relationship.",
-        "Small quasi-static angle-of-attack disturbance.",
-        "Same aircraft configuration and flight condition.",
-        "Positive pitching moment and positive angle of attack are nose-up.",
-    ],
-
-    validityLimits: [
-        "Not intended for stall or large-angle nonlinear behavior.",
-        "Does not model time history or damping.",
-        "Does not assess control authority or handling qualities.",
-        "Restoring tendency alone does not establish safety, controllability, or flightworthiness.",
-        "Trim is meaningful only when the linear model is valid.",
-    ],
-
-    simulation: {
-        analysisOnly: true,
-        duration: 1,
-        initialState: {},
-        controls: {},
-        disturbance: {},
-    },
-
-    analyze(aircraft, capabilityContext = {}) {
-        const analysis = calculateAnalysis(aircraft);
-        const capabilityAvailable =
-            hasRequiredCapability(capabilityContext);
-
-        return {
-            results: [
-                {
-                    key: "cm",
-                    label: "Cm(alpha)",
-                    value: analysis.cm,
-                    unit: "",
-                    precision: 6,
-                    emphasis: "primary",
-                },
-                {
-                    key: "trimAngleDeg",
-                    label: "Trim angle",
-                    value: analysis.trimAngleDeg,
-                    unit: "deg",
-                    precision: 3,
-                },
-                {
-                    key: "deltaCm",
-                    label: "Delta Cm",
-                    value: analysis.deltaCm,
-                    unit: "",
-                    precision: 6,
-                },
-                {
-                    key: "trimmed",
-                    label: "Selected condition trimmed",
-                    value: analysis.trimmed,
-                    unit: "",
-                    precision: 0,
-                },
-                {
-                    key: "tendency",
-                    label: "Disturbance tendency",
-                    value: analysis.tendency,
-                    unit: "",
-                    precision: 0,
-                },
-                {
-                    key: "requiredCapabilityAvailable",
-                    label: "Required load capability available",
-                    value: capabilityAvailable,
-                    unit: "",
-                    precision: 0,
-                },
-            ],
-
-            verificationCases: makeVerificationCases(),
-
-            decision: {
-                status: analysis.trimmed
-                    ? analysis.tendency === "restoring"
-                        ? "pass"
-                        : "caution"
-                    : "caution",
-                label: analysis.trimmed
-                    ? analysis.tendency === "restoring"
-                        ? "Trimmed with restoring tendency"
-                        : "Trimmed but disturbance tendency is not restoring"
-                    : "Selected condition is not trimmed",
-            },
-
-            plots: [buildPlot()],
-
-            scene: null,
-        };
-    },
-
-    model: {
-        evaluate(runtimeContext = {}) {
-            const aircraft = runtimeContext.aircraft;
-
-            if (!aircraft) {
-                throw new TypeError("runtimeContext.aircraft is required");
-            }
-
-            const values = calculateAnalysis(aircraft);
-
-            return {
-                values,
-            };
-        },
-    },
+  },
 };
 
-export default trimResponseFeature;
+export const model = {
+  kind: "derived",
+
+  evaluate(runtimeContext) {
+    const aircraft = runtimeContext?.aircraft;
+
+    if (!aircraft) {
+      throw new TypeError("runtimeContext.aircraft is required");
+    }
+
+    const calculated = analyzePitchingMoment(aircraft);
+
+    return {
+      values: {
+        cm: calculated.cm,
+        trimAngleDeg: calculated.trimAngleDeg,
+        deltaCm: calculated.deltaCm,
+        trimmed: calculated.trimmed,
+        disturbanceTendency: calculated.disturbanceTendency,
+      },
+    };
+  },
+};

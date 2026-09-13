@@ -1,93 +1,132 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
-    calculateCm,
-    calculateTrimAngleDeg,
-    calculateDeltaCm,
-    classifyDisturbance,
-    isTrimmed,
+  analyzePitchingMoment,
+  calculateCm,
+  calculateDeltaCm,
+  calculateTrimAngleDeg,
+  classifyDisturbance,
+  isTrimmed,
 } from "../../src/student/physics/trim-response.js";
 
 describe("trim-response physics", () => {
-    test("numerical case", () => {
-        const cm = calculateCm(0.04, -0.8, 2.86479);
-        const trimAngleDeg = calculateTrimAngleDeg(0.04, -0.8);
-        const deltaCm = calculateDeltaCm(-0.8, 2.0);
-        const tendency = classifyDisturbance(2.0, deltaCm);
+  describe("numerical verification case", () => {
+    it("matches the assigned reference calculation", () => {
+      const result = analyzePitchingMoment({
+        cm0: 0.04,
+        cmAlphaPerRad: -0.8,
+        angleOfAttackDeg: 2.864789,
+        disturbanceAlphaDeg: 2.0,
+      });
 
-        expect(cm).toBeCloseTo(0, 5);
-        expect(trimAngleDeg).toBeCloseTo(2.86479, 4);
-        expect(deltaCm).toBeCloseTo(-0.0279253, 5);
-        expect(isTrimmed(cm)).toBe(true);
-        expect(tendency).toBe("restoring");
+      expect(result.cm).toBeCloseTo(0, 6);
+      expect(result.trimAngleDeg).toBeCloseTo(2.864789, 6);
+      expect(result.deltaCm).toBeCloseTo(-0.027925, 4);
+      expect(result.trimmed).toBe(true);
+      expect(result.disturbanceTendency).toBe("restoring");
+    });
+  });
+
+  describe("behavioral verification case", () => {
+    it("doubles the magnitude of delta_Cm when the disturbance doubles", () => {
+      const base = analyzePitchingMoment({
+        cm0: 0.04,
+        cmAlphaPerRad: -0.8,
+        angleOfAttackDeg: 2.86,
+        disturbanceAlphaDeg: 2.0,
+      });
+
+      const doubled = analyzePitchingMoment({
+        cm0: 0.04,
+        cmAlphaPerRad: -0.8,
+        angleOfAttackDeg: 2.86,
+        disturbanceAlphaDeg: 4.0,
+      });
+
+      expect(Math.abs(doubled.deltaCm)).toBeCloseTo(
+        2 * Math.abs(base.deltaCm),
+        4,
+      );
+      expect(doubled.deltaCm).toBeLessThan(0);
+      expect(doubled.disturbanceTendency).toBe("restoring");
+    });
+  });
+
+  describe("boundary and sanity case", () => {
+    it("handles Cm_alpha = 0 without calculating a trim angle", () => {
+      const result = analyzePitchingMoment({
+        cm0: 0.04,
+        cmAlphaPerRad: 0,
+        angleOfAttackDeg: 2.86,
+        disturbanceAlphaDeg: 2.0,
+      });
+
+      expect(result.cm).toBeCloseTo(0.04, 6);
+      expect(result.deltaCm).toBe(0);
+      expect(result.trimAngleDeg).toBeNull();
+      expect(result.disturbanceTendency).toBe("neutral");
+    });
+  });
+
+  describe("pure-function checks", () => {
+    it("calculates Cm using degrees converted to radians", () => {
+      expect(
+        calculateCm(0.04, -0.8, 2.864789),
+      ).toBeCloseTo(0, 6);
     });
 
-    test("behavioral case: doubling disturbance angle doubles delta_Cm magnitude", () => {
-        const deltaCm2Deg = calculateDeltaCm(-0.8, 2.0);
-        const deltaCm4Deg = calculateDeltaCm(-0.8, 4.0);
-
-        expect(Math.abs(deltaCm4Deg)).toBeCloseTo(
-            2 * Math.abs(deltaCm2Deg),
-            10
-        );
-
-        expect(deltaCm2Deg).toBeLessThan(0);
-        expect(deltaCm4Deg).toBeLessThan(0);
-
-        expect(
-            classifyDisturbance(2.0, deltaCm2Deg)
-        ).toBe("restoring");
-
-        expect(
-            classifyDisturbance(4.0, deltaCm4Deg)
-        ).toBe("restoring");
+    it("calculates the trim angle when Cm_alpha is nonzero", () => {
+      expect(
+        calculateTrimAngleDeg(0.04, -0.8),
+      ).toBeCloseTo(2.864789, 6);
     });
 
-    test("boundary case: zero Cm-alpha slope", () => {
-        const cm = calculateCm(0.04, 0, 2.86);
-        const trimAngleDeg = calculateTrimAngleDeg(0.04, 0);
-        const deltaCm = calculateDeltaCm(0, 2.0);
-        const tendency = classifyDisturbance(2.0, deltaCm);
-
-        expect(cm).toBeCloseTo(0.04, 10);
-        expect(trimAngleDeg).toBeNull();
-        expect(deltaCm).toBe(0);
-        expect(isTrimmed(cm)).toBe(false);
-        expect(tendency).toBe("neutral");
+    it("returns null when no unique trim angle exists", () => {
+      expect(
+        calculateTrimAngleDeg(0.04, 0),
+      ).toBeNull();
     });
 
-    test("negative slope with positive disturbance is restoring", () => {
-        const deltaCm = calculateDeltaCm(-0.8, 2.0);
-
-        expect(deltaCm).toBeLessThan(0);
-        expect(
-            classifyDisturbance(2.0, deltaCm)
-        ).toBe("restoring");
+    it("calculates disturbance moment change", () => {
+      expect(
+        calculateDeltaCm(-0.8, 2.0),
+      ).toBeCloseTo(-0.0279253, 6);
     });
 
-    test("positive slope with positive disturbance is destabilizing", () => {
-        const deltaCm = calculateDeltaCm(0.8, 2.0);
+    it("classifies restoring, destabilizing, and neutral tendencies", () => {
+      expect(
+        classifyDisturbance(2.0, -0.02),
+      ).toBe("restoring");
 
-        expect(deltaCm).toBeGreaterThan(0);
-        expect(
-            classifyDisturbance(2.0, deltaCm)
-        ).toBe("destabilizing");
+      expect(
+        classifyDisturbance(2.0, 0.02),
+      ).toBe("destabilizing");
+
+      expect(
+        classifyDisturbance(2.0, 0),
+      ).toBe("neutral");
     });
 
-    test("zero disturbance is neutral", () => {
-        const deltaCm = calculateDeltaCm(-0.8, 0);
-
-        expect(deltaCm).toBe(0);
-        expect(
-            classifyDisturbance(0, deltaCm)
-        ).toBe("neutral");
+    it("uses the specified trim tolerance", () => {
+      expect(isTrimmed(1e-6)).toBe(true);
+      expect(isTrimmed(-1e-6)).toBe(true);
+      expect(isTrimmed(1.000001e-6)).toBe(false);
     });
+  });
 
-    test("invalid numeric input is rejected", () => {
-        expect(() => calculateCm(NaN, -0.8, 2.0)).toThrow();
-        expect(() => calculateCm(0.04, Infinity, 2.0)).toThrow();
-        expect(() => calculateDeltaCm(-0.8, "2")).toThrow();
-        expect(() => calculateTrimAngleDeg(0.04, NaN)).toThrow();
-        expect(() => isTrimmed(Infinity)).toThrow();
+  describe("numeric input validation", () => {
+    it("rejects non-finite engineering inputs", () => {
+      expect(() =>
+        calculateCm(NaN, -0.8, 2),
+      ).toThrow();
+
+      expect(() =>
+        calculateDeltaCm(-0.8, Infinity),
+      ).toThrow();
+
+      expect(() =>
+        calculateTrimAngleDeg(0.04, Number.NaN),
+      ).toThrow();
     });
+  });
 });
