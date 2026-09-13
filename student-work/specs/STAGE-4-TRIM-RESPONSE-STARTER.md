@@ -113,33 +113,36 @@ Use the assigned class values or values approved by your instructor. Show the su
 Inputs:
 Cm0 = 0.04
 Cm_alpha = -0.8 1/rad
-alpha = 2.86 deg
+alpha = 2.864789 deg
 delta_alpha = +2.00 deg
 
 Angle conversion:
-alpha_rad = 2.86 deg * (pi/180deg) = 0.0499 rad
-delta_alpha_rad = 2.00 deg * (pi/180) = 0.0349 rad
+alpha_rad = 2.864789 deg * (pi/180 deg)
+          = 0.0500000 rad
+
+delta_alpha_rad = 2.00 deg * (pi/180 deg)
+                = 0.0349066 rad
 
 Current pitching-moment coefficient:
-Cm(alpha) = = Cm0 + Cm_alpha * alpha_rad
-          = 0.04 + (-0.8)(0.0499)
-         = 0.0001
+Cm(alpha) = Cm0 + Cm_alpha * alpha_rad
+          = 0.04 + (-0.8)(0.0500000)
+          = approximately 0
 
 Trim angle:
-alpha_trim_rad = = -0.04 / (-0.8)
-               = 0.0500 rad
-alpha_trim_deg = 0.0500 * (180 / pi)
-               = 2.865 
+alpha_trim_rad = -Cm0 / Cm_alpha
+               = -0.04 / (-0.8)
+               = 0.0500000 rad
+
+alpha_trim_deg = 0.0500000 * (180/pi)
+               = 2.864789 deg
 
 Disturbance response:
-delta_Cm =  Cm_alpha * delta_alpha_rad
-
-         = (-0.8)(0.0349)
-
-         = -0.027
+delta_Cm = Cm_alpha * delta_alpha_rad
+         = (-0.8)(0.0349066)
+         = -0.0279253
 
 Expected classifications:
-selected condition = trimmed 
+selected condition = trimmed
 disturbance tendency = restoring
 ```
 
@@ -152,18 +155,19 @@ Define all three cases before implementation. Include exact inputs, expected out
 Inputs:
 Cm0 = 0.04
 Cm_alpha = -0.8 1/rad
-alpha = 2.86 deg
+alpha = 2.864789 deg
 delta_alpha = +2.00 deg
 
 Expected:
-Cm(alpha) ≈ 0.0001
-alpha_trim ≈ 2.865 deg
-delta_Cm ≈ -0.027
+Cm(alpha) ≈ 0
+alpha_trim ≈ 2.864789 deg
+delta_Cm ≈ -0.027925
 selected condition = trimmed
 disturbance tendency = restoring
 
 Tolerance:
-Use 1e-4 for the numerical Cm and delta_Cm comparisons because the reference values are rounded.
+Use 1e-6 for Cm(alpha) and trim-status comparisons.
+Use 1e-4 for delta_Cm comparisons.
 
 ### 9.2 Behavioral case
 
