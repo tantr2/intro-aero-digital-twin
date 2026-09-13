@@ -47,11 +47,17 @@ function capabilityIsAvailable(capabilityContext, required) {
     if (capabilities && typeof capabilities === "object") {
       const entry = capabilities[required.id];
 
-      if (typeof entry === "number" && entry >= required.version) {
+      if (
+        typeof entry === "number" &&
+        entry >= required.version
+      ) {
         return true;
       }
 
-      if (typeof entry === "string" && Number(entry) >= required.version) {
+      if (
+        typeof entry === "string" &&
+        Number(entry) >= required.version
+      ) {
         return true;
       }
 
@@ -87,7 +93,9 @@ function buildPlotPoints(aircraft) {
   if (
     aircraft.angleOfAttackDeg >= PLOT_MIN_DEG &&
     aircraft.angleOfAttackDeg <= PLOT_MAX_DEG &&
-    !points.some((point) => point.x === aircraft.angleOfAttackDeg)
+    !points.some(
+      (point) => point.x === aircraft.angleOfAttackDeg,
+    )
   ) {
     points.push({
       x: aircraft.angleOfAttackDeg,
@@ -282,7 +290,10 @@ function buildResults(results) {
         results.trimAngleDeg === null
           ? "not available"
           : results.trimAngleDeg,
-      unit: results.trimAngleDeg === null ? "" : "deg",
+      unit:
+        results.trimAngleDeg === null
+          ? ""
+          : "deg",
       precision: 6,
       emphasis: false,
     },
@@ -436,24 +447,16 @@ export const feature = {
 
           title: "Cm–alpha relationship",
 
-          xAxis: {
-            label: "Angle of attack",
-            unit: "deg",
-            min: PLOT_MIN_DEG,
-            max: PLOT_MAX_DEG,
-          },
+          xLabel: "Angle of attack (deg)",
 
-          yAxis: {
-            label: "Pitching-moment coefficient",
-            unit: "",
-          },
+          yLabel: "Pitching-moment coefficient (dimensionless)",
+
+          points: buildPlotPoints(aircraft),
 
           series: [
             {
               id: "cm-alpha-model",
-
               label: "Cm(alpha)",
-
               points: buildPlotPoints(aircraft),
             },
           ],
@@ -468,6 +471,10 @@ export const feature = {
               value: 0,
             },
           ],
+
+          xMin: PLOT_MIN_DEG,
+
+          xMax: PLOT_MAX_DEG,
         },
       ],
 
